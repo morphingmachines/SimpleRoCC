@@ -1,0 +1,3 @@
+[submodule "emitrtl"]
+	path = dependencies/emitrtl
+	url = git@github.com:morphingmachines/emitrtl.git
