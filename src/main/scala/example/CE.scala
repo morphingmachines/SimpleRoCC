@@ -1,14 +1,13 @@
 package simpleRoCC.example
 
 import chisel3._
+import chisel3.util.log2Ceil
 import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.interrupts._
 import freechips.rocketchip.subsystem.RocketCrossingParams
 import freechips.rocketchip.tile.{HartsWontDeduplicate, NMI, RocketTileParams, TileKey, TraceBundle, XLen}
-import freechips.rocketchip.tilelink.{TLManagerNode, TLSlaveParameters, TLSlavePortParameters}
+import freechips.rocketchip.tilelink.{TLManagerNode, TLSlaveParameters, TLSlavePortParameters, TLXbar}
 import org.chipsalliance.cde.config.Parameters
-import freechips.rocketchip.tilelink.TLXbar
-import chisel3.util.log2Ceil
 
 class CERISCV(implicit p: Parameters) extends LazyModule with BindingScope {
   val cetile = LazyModule(
@@ -117,19 +116,25 @@ class CeTop(implicit p: Parameters) extends CERISCV with WithMemPortIO {
   override lazy val module = new CeTopImp(this)
 }
 
-class CeTopImp(outer: CeTop) extends CERISCVImp(outer) {
-}
+class CeTopImp(outer: CeTop) extends CERISCVImp(outer) {}
 
 class CeWithRoCCDMA(implicit p: Parameters) extends CERISCV with WithMemPortIO {
   require(p(simpleRoCC.InsertRoCCIO))
-    val addrWidth = log2Ceil(tile_sink.portParams.map(i => i.maxAddress).max)
-    println(s"MaxAddrWidth: ${addrWidth}")
-    val dma       = LazyModule(new DMA(2, addrWidth))
-    mbus := dma.rdClient
-    mbus := dma.wrClient
+  val addrWidth = log2Ceil(tile_sink.portParams.map(i => i.maxAddress).max)
+  println(s"MaxAddrWidth: ${addrWidth}")
+  val dma = LazyModule(new DMA(2, addrWidth))
+  mbus := dma.rdClient
+  mbus := dma.wrClient
   override lazy val module = new CeWIthRoCCDMAImp(this)
 }
 
 class CeWIthRoCCDMAImp(outer: CeWithRoCCDMA) extends CERISCVImp(outer) {
-    outer.cetile.module.roccifc.map(i => i <> outer.dma.module.io)
+  outer.cetile.module.roccifc.map { i =>
+    require(
+      i.mem.req.bits.addr.getWidth >= outer.dma.module.io.mem.req.bits.addr.getWidth,
+      s"${i.mem.req.bits.addr.getWidth} ${outer.dma.module.io.mem.req.bits.addr.getWidth}",
+    )
+    require(i.mem.req.bits.tag.getWidth >= outer.dma.module.io.mem.req.bits.tag.getWidth)
+    i <> outer.dma.module.io
+  }
 }

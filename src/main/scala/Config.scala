@@ -2,7 +2,7 @@ package simpleRoCC
 
 import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.rocket.{DCacheParams, ICacheParams, MulDivParams, PgLevels, RocketCoreParams}
-import freechips.rocketchip.subsystem.{CacheBlockBytes}
+import freechips.rocketchip.subsystem.CacheBlockBytes
 import freechips.rocketchip.tile.{
   AccumulatorExample,
   BuildRoCC,

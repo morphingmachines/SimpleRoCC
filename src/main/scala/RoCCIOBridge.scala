@@ -71,9 +71,6 @@ class RoCCIOBridgeImp(outer: RoCCIOBridge) extends LazyRoCCModuleImp(outer) {
   require(io.mem.req.bits.tag.getWidth >= roccifc.mem.req.bits.tag.getWidth)
   require(io.csrs.length == roccifc.csrs.length)
 
-
-
-
   io.mem.req <> roccifc.mem.req
   roccifc.mem.resp.valid     := io.mem.resp.valid
   roccifc.mem.resp.bits.data := io.mem.resp.bits.data
@@ -99,10 +96,11 @@ class RocketTileWithRoCCIO(
 }
 
 class RocketTileWithRoCCIOImp(outer: RocketTileWithRoCCIO) extends RocketTileModuleImp(outer) {
-  val addrWidth = outer.p(XLen)
+  val addrWidth = outer.dcache.module.io.cpu.req.bits.addr.getWidth
   val tagWidth  = 5
 
-  val roccifc = if (p(InsertRoCCIO)) Some(IO(Flipped(new SimpleRoCCCoreIO(xLen, addrWidth, tagWidth)))) else None
+  val roccifc =
+    if (p(InsertRoCCIO)) Some(IO(Flipped(new SimpleRoCCCoreIO(outer.p(XLen), addrWidth, tagWidth)))) else None
 
   roccifc.map { i =>
     val ioBridge = outer.roccs(0).module.asInstanceOf[RoCCIOBridgeImp]
