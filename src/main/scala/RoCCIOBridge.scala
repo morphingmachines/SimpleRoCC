@@ -56,7 +56,7 @@ class RoCCIOBridgeTop(opcodes: OpcodeSet = OpcodeSet.custom0, roccCSRs: Seq[Cust
 class RoCCIOBridgeTopImp(outer: RoCCIOBridgeTop) extends RoCCIOBridgeImp(outer) {}
 
 class RoCCIOBridge(opcodes: OpcodeSet = OpcodeSet.custom0, roccCSRs: Seq[CustomCSR] = Nil)(implicit p: Parameters)
-  extends LazyRoCC(opcodes, roccCSRs = roccCSRs) {
+  extends LazyRoCC(opcodes = opcodes, roccCSRs = roccCSRs) {
 
   override lazy val module = new RoCCIOBridgeImp(this)
 }
@@ -66,10 +66,12 @@ class RoCCIOBridgeImp(outer: RoCCIOBridge) extends LazyRoCCModuleImp(outer) {
   val addrWidth = io.mem.req.bits.addr.getWidth
   val tagWidth  = 5
 
-  val roccifc = IO(Flipped(new SimpleRoCCCoreIO(xLen, addrWidth, tagWidth)))
-  println(s"${io.mem.req.bits.addr.getWidth}  >= ${roccifc.mem.req.bits.addr.getWidth}")
-  require(io.mem.req.bits.tag.getWidth >= roccifc.mem.req.bits.tag.getWidth)
-  require(io.csrs.length == roccifc.csrs.length)
+  val roccifc = IO(Flipped(new SimpleRoCCCoreIO(xLen, addrWidth, tagWidth, outer.roccCSRs.length)))
+  require(
+    io.mem.req.bits.tag.getWidth >= roccifc.mem.req.bits.tag.getWidth,
+    s"${io.mem.req.bits.addr.getWidth} >= ${roccifc.mem.req.bits.addr.getWidth}",
+  )
+  require(io.csrs.length == roccifc.csrs.length, s"${io.csrs.length}  >= ${roccifc.csrs.length}")
 
   io.mem.req <> roccifc.mem.req
   roccifc.mem.resp.valid     := io.mem.resp.valid
@@ -96,11 +98,15 @@ class RocketTileWithRoCCIO(
 }
 
 class RocketTileWithRoCCIOImp(outer: RocketTileWithRoCCIO) extends RocketTileModuleImp(outer) {
-  val addrWidth = outer.dcache.module.io.cpu.req.bits.addr.getWidth
-  val tagWidth  = 5
 
   val roccifc =
-    if (p(InsertRoCCIO)) Some(IO(Flipped(new SimpleRoCCCoreIO(outer.p(XLen), addrWidth, tagWidth)))) else None
+    if (p(InsertRoCCIO)) {
+      val addrWidth = outer.dcache.module.io.cpu.req.bits.addr.getWidth
+      val tagWidth  = 5 // NOTE: all accelerators behind this RoCCIO must share this 5-bits
+      require(outer.roccs.size == 1)
+      val nCSRs = outer.roccs(0).roccCSRs.size // NOTE: Only one RoCC accelerator connected to RocketCore
+      Some(IO(Flipped(new SimpleRoCCCoreIO(outer.p(XLen), addrWidth, tagWidth, nCSRs))))
+    } else None
 
   roccifc.map { i =>
     val ioBridge = outer.roccs(0).module.asInstanceOf[RoCCIOBridgeImp]
@@ -108,6 +114,7 @@ class RocketTileWithRoCCIOImp(outer: RocketTileWithRoCCIO) extends RocketTileMod
     ioBridge.roccifc.cmd <> i.cmd
     ioBridge.roccifc.resp <> i.resp
     ioBridge.roccifc.mem <> i.mem
+    ioBridge.roccifc.csrs <> i.csrs
     ioBridge.roccifc.interrupt := i.interrupt
     i.exception                := ioBridge.roccifc.exception
   }

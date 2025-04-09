@@ -1,10 +1,7 @@
 {
     "metals.millScript": "./mill",
     "files.watcherExclude": {
-        "**/target": true,
-        "**/out": true,
-        "**/test_run_dir": true,
-        "**/generated_sv_dir": true
+        "**/target": true
     },
     "GitCommitPlugin.MaxSubjectCharacters": 50,
     "GitCommitPlugin.Templates": [
