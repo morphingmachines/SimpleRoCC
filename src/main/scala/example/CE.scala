@@ -2,12 +2,18 @@ package simpleRoCC.example
 
 import chisel3._
 import chisel3.util.log2Ceil
-import freechips.rocketchip.diplomacy._
+import org.chipsalliance.diplomacy.lazymodule._
+import freechips.rocketchip.resources.BindingScope
+import org.chipsalliance.diplomacy.lazymodule.InModuleBody
+import freechips.rocketchip.diplomacy.{AddressSet, RegionType, TransferSizes}
+import org.chipsalliance.diplomacy.bundlebridge.{BundleBridgeSource, BundleBridgeSink}
+import org.chipsalliance.diplomacy.ValName
 import freechips.rocketchip.interrupts._
 import freechips.rocketchip.subsystem.RocketCrossingParams
-import freechips.rocketchip.tile.{HartsWontDeduplicate, NMI, RocketTileParams, TileKey, TraceBundle, XLen}
+import freechips.rocketchip.tile.{HartsWontDeduplicate, NMI, RocketTileParams, TileKey, TraceBundle}
 import freechips.rocketchip.tilelink.{TLManagerNode, TLSlaveParameters, TLSlavePortParameters, TLXbar}
 import org.chipsalliance.cde.config.Parameters
+import simpleRoCC.XLen
 
 class CERISCV(implicit p: Parameters) extends LazyModule with BindingScope {
   val cetile = LazyModule(

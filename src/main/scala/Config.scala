@@ -1,7 +1,7 @@
 package simpleRoCC
 
-import freechips.rocketchip.diplomacy._
-import freechips.rocketchip.rocket.{DCacheParams, ICacheParams, MulDivParams, PgLevels, RocketCoreParams}
+import org.chipsalliance.diplomacy.lazymodule._
+import freechips.rocketchip.rocket.{DCacheParams, ICacheParams, MulDivParams, RocketCoreParams}
 import freechips.rocketchip.subsystem.CacheBlockBytes
 import freechips.rocketchip.tile.{
   AccumulatorExample,
@@ -10,9 +10,9 @@ import freechips.rocketchip.tile.{
   OpcodeSet,
   RocketTileParams,
   TileKey,
-  XLen,
 }
-import org.chipsalliance.cde.config.{Config, Parameters}
+import org.chipsalliance.cde.config.{Config, Parameters, Field}
+case object XLen extends Field[Int]
 
 class CEConfig
   extends Config((site, here, _) => {
@@ -21,6 +21,8 @@ class CEConfig
     case TileKey => {
       RocketTileParams(
         core = RocketCoreParams(
+          xLen = site(XLen),
+          pgLevels = 2,
           useVM = false,
           fpu = None,
           mulDiv = Some(MulDivParams(mulUnroll = 8)),
@@ -54,7 +56,6 @@ class CEConfig
       )
     }
     case MaxHartIdBits => 8
-    case PgLevels      => if (site(XLen) == 64) 3 /* Sv39 */ else 2 /* Sv32 */
   })
 
 class WithAccumulatorRoCCExample

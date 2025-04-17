@@ -2,8 +2,9 @@ package simpleRoCC.example
 
 import chisel3._
 import chisel3.util._
-import freechips.rocketchip.diplomacy.{IdRange, LazyModule, LazyModuleImp}
-import freechips.rocketchip.tile.XLen
+import org.chipsalliance.diplomacy.lazymodule._
+import freechips.rocketchip.diplomacy.IdRange
+import simpleRoCC.XLen
 import freechips.rocketchip.tilelink.{IDMapGenerator, TLClientNode, TLMasterParameters, TLMasterPortParameters}
 import freechips.rocketchip.util.TwoWayCounter
 import org.chipsalliance.cde.config.Parameters

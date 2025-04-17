@@ -1,7 +1,8 @@
 package simpleRoCC
 
 import chisel3._
-import freechips.rocketchip.diplomacy._
+//import org.chipsalliance.diplomacy.lazymodule._
+import freechips.rocketchip.diplomacy.{AddressSet, RegionType, TransferSizes}
 import freechips.rocketchip.subsystem.HierarchicalElementCrossingParamsLike
 import freechips.rocketchip.tile.{
   CustomCSR,
@@ -13,7 +14,6 @@ import freechips.rocketchip.tile.{
   RocketTileModuleImp,
   RocketTileParams,
   TileVisibilityNodeKey,
-  XLen,
 }
 import freechips.rocketchip.tilelink.{
   TLClientNode,
@@ -24,6 +24,7 @@ import freechips.rocketchip.tilelink.{
   TLSlavePortParameters,
 }
 import org.chipsalliance.cde.config.{Field, Parameters}
+import simpleRoCC.XLen
 
 case object InsertRoCCIO extends Field[Boolean](false)
 
@@ -40,7 +41,7 @@ class RoCCIOBridgeTop(opcodes: OpcodeSet = OpcodeSet.custom0, roccCSRs: Seq[Cust
   val dummySlave  = TLManagerNode(Seq(TLSlavePortParameters.v1(Seq(dummySlaveParams), beatBytes = 4)))
   val dummyMaster = TLClientNode(Seq(TLMasterPortParameters.v1(Seq(TLMasterParameters.v1(name = "dummyMaster")))))
 
-  DisableMonitors { implicit p =>
+ 
     /* Dummy Slave and Sink, that emulates intra-tile master and the rest of the system it communicates with.
        The tile see the rest of the system through "p(TileVisibiltyNodeKey)". Since RoCC Accelerator is part of the Tile,
        any tile-link master interface of the RoCC accelerator must connect to other slaves in the rest of the system through
@@ -48,7 +49,7 @@ class RoCCIOBridgeTop(opcodes: OpcodeSet = OpcodeSet.custom0, roccCSRs: Seq[Cust
        to know p(TileVisibilityNodeKey) for determining the physical address bit-width, to interface with L1DCache.
      */
     dummySlave := p(TileVisibilityNodeKey) := dummyMaster
-  }
+  
 
   override lazy val module = new RoCCIOBridgeTopImp(this)
 }
