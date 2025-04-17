@@ -22,7 +22,7 @@ class CEConfig
       RocketTileParams(
         core = RocketCoreParams(
           xLen = site(XLen),
-          pgLevels = 2,
+          pgLevels = if (site(XLen) == 64) 3 /* Sv39 */ else 2 /* Sv32 */,
           useVM = false,
           fpu = None,
           mulDiv = Some(MulDivParams(mulUnroll = 8)),

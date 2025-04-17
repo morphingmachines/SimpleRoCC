@@ -34,6 +34,7 @@ class SimpleHellaCacheReq(xLen: Int, addrWidth: Int, tagWidth: Int) extends Bund
   val phys     = Bool()
   val no_alloc = Bool()
   val no_xcpt  = Bool()
+  val no_resp  = Bool()
 }
 
 class SimpleHellaCacheResp(xLen: Int, tagWidth: Int) extends Bundle {
