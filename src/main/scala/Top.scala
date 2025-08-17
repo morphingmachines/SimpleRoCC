@@ -1,8 +1,8 @@
 package simpleRoCC
 
 import emitrtl._
-import org.chipsalliance.diplomacy.lazymodule._
 import freechips.rocketchip.tile.OpcodeSet
+import org.chipsalliance.diplomacy.lazymodule._
 
 /** To run from a terminal shell
   * {{{

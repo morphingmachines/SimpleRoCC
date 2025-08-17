@@ -1,17 +1,10 @@
 package simpleRoCC
 
-import org.chipsalliance.diplomacy.lazymodule._
 import freechips.rocketchip.rocket.{DCacheParams, ICacheParams, MulDivParams, RocketCoreParams}
 import freechips.rocketchip.subsystem.CacheBlockBytes
-import freechips.rocketchip.tile.{
-  AccumulatorExample,
-  BuildRoCC,
-  MaxHartIdBits,
-  OpcodeSet,
-  RocketTileParams,
-  TileKey,
-}
-import org.chipsalliance.cde.config.{Config, Parameters, Field}
+import freechips.rocketchip.tile.{AccumulatorExample, BuildRoCC, MaxHartIdBits, OpcodeSet, RocketTileParams, TileKey}
+import org.chipsalliance.cde.config.{Config, Field, Parameters}
+import org.chipsalliance.diplomacy.lazymodule._
 case object XLen extends Field[Int]
 
 class CEConfig

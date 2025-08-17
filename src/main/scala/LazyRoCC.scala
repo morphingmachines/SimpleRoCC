@@ -25,13 +25,12 @@ class AccumulatorWrapper(opcodes: OpcodeSet = OpcodeSet.custom0)(implicit p: Par
   val dummySlave  = TLManagerNode(Seq(TLSlavePortParameters.v1(Seq(dummySlaveParams), beatBytes = 4)))
   val dummyMaster = TLClientNode(Seq(TLMasterPortParameters.v1(Seq(TLMasterParameters.v1(name = "dummyMaster")))))
 
-    /* Dummy Slave and Sink, that emulates intra-tile master and the rest of the system it communicates with.
+  /* Dummy Slave and Sink, that emulates intra-tile master and the rest of the system it communicates with.
        The tile see the rest of the system through "p(TileVisibiltyNodeKey)". Since RoCC Accelerator is part of the Tile,
        any tile-link master interface of the RoCC accelerator must connect to other slaves in the rest of the system through
        p(TileVisibilityNodeKey). In a standalone RoCC accelerator module, without any TL master interface, we will still need
        to know p(TileVisibilityNodeKey) for determining the physical address bit-width, to interface with L1DCache.
-     */
-    dummySlave := p(TileVisibilityNodeKey) := dummyMaster
-  
+   */
+  dummySlave := p(TileVisibilityNodeKey) := dummyMaster
 
 }
