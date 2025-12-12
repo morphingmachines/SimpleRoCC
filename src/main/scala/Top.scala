@@ -1,6 +1,5 @@
 package simpleRoCC
 
-import emitrtl._
 import freechips.rocketchip.tile.OpcodeSet
 import org.chipsalliance.diplomacy.lazymodule._
 
@@ -10,10 +9,11 @@ import org.chipsalliance.diplomacy.lazymodule._
   * }}}
   */
 
-object Main extends App with LazyToplevel {
+object Main extends App with emitrtl.LazyToplevel {
   import org.chipsalliance.cde.config.{Parameters, Config}
   val str = if (args.length == 0) "" else args(0)
   val lazyTop = str match {
+    case "TL2RoCC"    => LazyModule(new TL2RoCCWrapper()(new Config(new RV32Config)))
     case "RV32"       => LazyModule(new example.CeTop()(new Config(new RV32Config)))
     case "RV32RoCCIO" => LazyModule(new example.CeWithRoCCDMA()(new Config(new RV32WithRoCCIOConfig)))
     case "RV64RoCCIO" => LazyModule(new example.CeWithRoCCDMA()(new Config(new RV64WithRoCCIOConfig)))
