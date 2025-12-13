@@ -91,8 +91,14 @@ class TLRegister2RoCCImp(outer: TLRegister2RoCC) extends LazyModuleImp(outer) {
     rocc.cmd.bits.rs2 := roccCmdReqBuf.io.deq.bits(127, 96)
   }
 
-  val roccCmdRespBuf = Module(new Queue(new SimpleRoCCResponse(params.xLen), 32))
-  roccCmdRespBuf.io.enq <> rocc.resp
+  val roccCmdRespBuf = Seq.fill(32)(Module(new Queue(UInt(params.xLen.W), 1)))
+  for (i <- 0 until 32) {
+    roccCmdRespBuf(i).io.enq.valid := rocc.resp.valid && rocc.resp.bits.rd === i.U
+    roccCmdRespBuf(i).io.enq.bits  := rocc.resp.bits.data
+    rocc.resp.ready := roccCmdRespBuf.zipWithIndex.map { case (x, i) =>
+      (x.io.enq.ready) && (rocc.resp.bits.rd === i.U)
+    }.reduce(_ || _)
+  }
 
   val csr = Seq.fill(params.nRoCCCSRs)(RegInit(0.U(params.xLen.W)))
 
@@ -127,11 +133,12 @@ class TLRegister2RoCCImp(outer: TLRegister2RoCC) extends LazyModuleImp(outer) {
   require(csrStallReg.length <= 8)
   val roccStatus = Cat(roccBusyReg.asUInt, Cat(csrStallReg.map(_.asUInt).reverse.toSeq).pad(8))
 
-  def roccCmdRespRdFunc(iValid_Oready: Bool): (Bool, UInt) = {
-    roccCmdRespBuf.io.deq.ready := iValid_Oready
+  def roccCmdRespRdFunc(i: Int)(iValid_Oready: Bool): (Bool, UInt) = {
+
+    roccCmdRespBuf(i).io.deq.ready := iValid_Oready
     (
-      roccCmdRespBuf.io.deq.valid,
-      Cat(roccCmdRespBuf.io.deq.bits.data.pad(64), roccCmdRespBuf.io.deq.bits.rd.pad(32)).pad(256),
+      true.B,
+      Cat(roccCmdRespBuf(i).io.deq.valid, roccCmdRespBuf(i).io.deq.bits.pad(64)).pad(256),
     )
   }
 
@@ -159,34 +166,34 @@ class TLRegister2RoCCImp(outer: TLRegister2RoCC) extends LazyModuleImp(outer) {
 
   outer.regNode.regmap(
     0x000 -> RegFieldGroup(
-      "RoCCCommandRequest",
-      Some("RoCC Command Request packed to 256-bits. {0,rs2,rs1,Inst}"),
-      Seq(RegField.w(256, roccCmdReqBuf.io.enq)),
+      "RoccCSR",
+      Some("RoCC CSR Registers"),
+      csr.zipWithIndex.map { case (_, i) => RegField(64, csrRdFunc(i)(_), csrWrFunc(i)(_, _)) },
     ),
-    0x020 -> RegFieldGroup(
-      "RoCCCommandResponse",
-      Some("RoCC Command response packed as 256-bits. {data, {0, rd}}"),
-      Seq(RegField.r(256, roccCmdRespRdFunc(_))),
-    ),
-    0x040 -> RegFieldGroup(
+    0x100 -> RegFieldGroup(
       "RoCCHellaCacheReq",
       Some("RoCC Hella Cache request interface {data64,addr64,{tag,mask,size,cmd}}"),
       Seq(RegField.r(256, roCCMemReqRdFunc(_))),
     ),
-    0x060 -> RegFieldGroup(
+    0x120 -> RegFieldGroup(
       "RoCCHellaCacheResp",
       Some("RoCC Hella Cache request interface {data64,addr64,{tag,mask,size,cmd}}"),
       Seq(RegField.w(256, roCCMemRespWrFunc(_, _))),
     ),
-    0x080 -> RegFieldGroup(
+    0x140 -> RegFieldGroup(
       "RoCCInterfaceStatus",
       Some("RoCC interface status {CSR-Stall_8, busy_8}"),
       Seq(RegField.r(16, roccStatus)),
     ),
-    0x100 -> RegFieldGroup(
-      "RoccCSR",
-      Some("RoCC CSR Registers"),
-      csr.zipWithIndex.map { case (_, i) => RegField(64, csrRdFunc(i)(_), csrWrFunc(i)(_, _)) },
+    0x180 -> RegFieldGroup(
+      "RoCCCommandRequest",
+      Some("RoCC Command Request packed to 256-bits. {0,rs2,rs1,Inst}"),
+      Seq(RegField.w(256, roccCmdReqBuf.io.enq)),
+    ),
+    0x200 -> RegFieldGroup(
+      "RoCCCommandResponse",
+      Some("RoCC Command response packed as 256-bits. {data, {0, rd}}"),
+      roccCmdRespBuf.zipWithIndex.map { case (_, i) => RegField.r(256, roccCmdRespRdFunc(i)(_)) },
     ),
   )
 }
