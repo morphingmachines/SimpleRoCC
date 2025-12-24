@@ -3,7 +3,7 @@ package simpleRoCC
 import chisel3._
 import chisel3.util._
 import freechips.rocketchip.diplomacy._
-import freechips.rocketchip.regmapper.{RegField, RegFieldGroup}
+import freechips.rocketchip.regmapper.{RegField, RegFieldDesc, RegFieldGroup}
 import freechips.rocketchip.resources.SimpleDevice
 import freechips.rocketchip.rocket._
 import freechips.rocketchip.tile.RoCCInstruction
@@ -41,6 +41,8 @@ class TLRegister2RoCCImp(outer: TLRegister2RoCC) extends LazyModuleImp(outer) {
     ),
   )
 
+  require(params.nRoCCCSRs <= 32, "TLRegisterNode memory-map can accommodate only 32 CSRs.")
+
   rocc.exception := false.B
 
   class RoCCMemReq extends Bundle {
@@ -57,7 +59,7 @@ class TLRegister2RoCCImp(outer: TLRegister2RoCC) extends LazyModuleImp(outer) {
       val rAddr = addr.pad(64)
       val rData = data.pad(64)
       val rInfo = Cat(tag.pad(8), mask.pad(8), size.pad(8), cmd.pad(8))
-      Cat(rData, rAddr, rInfo.pad(64))
+      Cat(rInfo.pad(32), rAddr, rData)
     }
 
   }
@@ -130,15 +132,15 @@ class TLRegister2RoCCImp(outer: TLRegister2RoCC) extends LazyModuleImp(outer) {
 
   val roccBusyReg = RegNext(rocc.busy)
   val csrStallReg = rocc.csrs.map(i => RegNext(i.stall))
-  require(csrStallReg.length <= 8)
-  val roccStatus = Cat(roccBusyReg.asUInt, Cat(csrStallReg.map(_.asUInt).reverse.toSeq).pad(8)).pad(16)
+  require(csrStallReg.length <= 32)
+  val roccStatus = Cat(roccBusyReg.asUInt, Cat(csrStallReg.map(_.asUInt).reverse.toSeq).pad(32)).pad(64)
 
   def roccCmdRespRdFunc(i: Int)(iValid_Oready: Bool): (Bool, UInt) = {
 
     roccCmdRespBuf(i).io.deq.ready := iValid_Oready
     (
       true.B,
-      Cat(roccCmdRespBuf(i).io.deq.valid, roccCmdRespBuf(i).io.deq.bits.pad(64)).pad(256),
+      roccCmdRespBuf(i).io.deq.bits.pad(64),
     )
   }
 
@@ -167,36 +169,59 @@ class TLRegister2RoCCImp(outer: TLRegister2RoCC) extends LazyModuleImp(outer) {
   outer.regNode.regmap(
     0x000 -> RegFieldGroup(
       "RoccCSR",
-      Some("RoCC CSR Registers; 32 bytes apart."),
+      Some("RoCC CSR Registers"),
       csr.zipWithIndex.flatMap { case (_, i) =>
-        RegField(64, csrRdFunc(i)(_), csrWrFunc(i)(_, _)) :: RegField(192) :: Nil
+        RegField(64, csrRdFunc(i)(_), csrWrFunc(i)(_, _), Some(RegFieldDesc(s"RoCCCSR$i", ""))) :: RegField(192) :: Nil
       },
     ),
     0x100 -> RegFieldGroup(
-      "RoCCHellaCacheReq",
-      Some("RoCC Hella Cache request interface {data64,addr64,{tag,mask,size,cmd}}"),
-      Seq(RegField.r(192, roCCMemReqRdFunc(_))),
-    ),
-    0x120 -> RegFieldGroup(
-      "RoCCHellaCacheResp",
-      Some("RoCC Hella Cache resp interface {{tag8,mask8},data64}"),
-      Seq(RegField.w(80, roCCMemRespWrFunc(_, _))),
+      "RoCCHellaCacheIfc",
+      Some("RoCC Hella Cache Interface"),
+      Seq(
+        RegField.r(
+          192,
+          roCCMemReqRdFunc(_),
+          RegFieldDesc("RequestIfc", "BitFields:{zero:31, valid:1, tag:8, mask:8, size:8, cmd:8, addr:64, data:64}"),
+        ),
+        RegField(64),
+        RegField.w(80, roCCMemRespWrFunc(_, _), RegFieldDesc("ResponseIfc", "BitFields:{tag:8 ,mask:8, data:64}")),
+        RegField(176),
+      ),
     ),
     0x140 -> RegFieldGroup(
-      "RoCCInterfaceStatus",
-      Some("RoCC interface status {CSR-Stall_8, busy_8}"),
-      Seq(RegField.r(16, roccStatus)),
+      "RoCCCSRStallStatus",
+      Some("RoCC CSR Stall Status"),
+      csrStallReg.zipWithIndex.flatMap { case (x, i) =>
+        RegField.r(1, x, RegFieldDesc(s"RoCCCSR${i}_Stall", "")) :: Nil
+      } ++
+        Seq(RegField(32 - csrStallReg.length)),
+    ),
+    0x144 -> RegFieldGroup(
+      "RoCCBusyStatus",
+      None,
+      Seq(RegField.r(1, roccBusyReg, RegFieldDesc("RoCCBusy", ""))),
     ),
     0x180 -> RegFieldGroup(
-      "RoCCCommandRequest",
-      Some("RoCC Command Request packed to 160-bits. {,rs2_64,rs1_64,Inst_32}"),
-      Seq(RegField.w(160, roccCmdReqBuf.io.enq)),
+      "RoCCCommandRequestIfc",
+      Some("RoCC Command Request Interface"),
+      Seq(
+        RegField.w(
+          160,
+          roccCmdReqBuf.io.enq,
+          RegFieldDesc("RoCCCmdReq", "BitFields:{rs2-value:64, rs1-value:64, rocc-instruction:32}"),
+        ),
+      ),
     ),
     0x200 -> RegFieldGroup(
       "RoCCCommandResponse",
-      Some("RoCC Command response packed as 256-bits. {{0,v}, data64}"),
+      Some(
+        "RoCC Command response. Each tag has its own address. Previous response must be read to receive next response.",
+      ),
       roccCmdRespBuf.zipWithIndex.flatMap { case (_, i) =>
-        RegField.r(96, roccCmdRespRdFunc(i)(_)) :: RegField(160) :: Nil
+        RegField.r(64, roccCmdRespRdFunc(i)(_), RegFieldDesc(s"CmdResponse$i", s"RoCC Command response with tag-$i")) ::
+          RegField.r(1, roccCmdRespBuf(i).io.deq.valid, RegFieldDesc(s"CmdResponse$i-valid", "")) :: RegField(
+            191,
+          ) :: Nil
       },
     ),
   )
